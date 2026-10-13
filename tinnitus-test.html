@@ -1,0 +1,1527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tinnitus Match</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky sound bar, numbered procedure rail on the left, one working panel at a time with audiometer-style readouts */
+:root {
+  --bg: #EDF0F3;
+  --surface: #FFFFFF;
+  --sunk: #E2E7EC;
+  --ink: #14202A;
+  --muted: #55636F;
+  --line: #CFD7DF;
+  --accent: #A85300;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #F6E6D3;
+  --left: #1F5FD6;
+  --right: #C8302A;
+  --ok: #1D7549;
+  --danger: #B42318;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1317; --surface: #151E25; --sunk: #0A0F13; --ink: #E3EAEF; --muted: #93A2AE; --line: #26343E;
+    --accent: #F0A142; --accent-ink: #1B1103; --accent-soft: #3A2911;
+    --left: #79A5FF; --right: #FF7A6E; --ok: #52C88F; --danger: #FF8574;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1317; --surface: #151E25; --sunk: #0A0F13; --ink: #E3EAEF; --muted: #93A2AE; --line: #26343E;
+  --accent: #F0A142; --accent-ink: #1B1103; --accent-soft: #3A2911;
+  --left: #79A5FF; --right: #FF7A6E; --ok: #52C88F; --danger: #FF8574;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--f-body); }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; letter-spacing: -0.012em; }
+h1 { font-size: clamp(1.75rem, 1.2rem + 2.2vw, 2.5rem); font-weight: 750; }
+h2 { font-size: 1.35rem; font-weight: 700; }
+h3 { font-size: 1.05rem; font-weight: 650; }
+p { margin: 0; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+.small { font-size: 0.875rem; }
+kbd { font: 500 0.72em var(--f-mono); border: 1px solid currentColor; border-radius: 4px; padding: 1px 5px; opacity: 0.75; margin-left: 8px; vertical-align: 0.15em; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Top bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.topbar-in { max-width: 1120px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font: 750 1.1rem var(--f-display); letter-spacing: -0.01em; margin-right: auto; }
+.brand svg { width: 28px; height: 28px; flex: none; }
+.brand .w1 { stroke: var(--accent); }
+.brand .w2 { stroke: var(--ink); }
+.sound-state { display: inline-flex; align-items: center; gap: 8px; font: 500 13px var(--f-mono); color: var(--muted); }
+.sound-state .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.sound-state.on { color: var(--ink); }
+.sound-state.on .dot { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+.stop { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--danger); background: transparent; color: var(--danger); font: 700 14px var(--f-body); cursor: pointer; }
+.stop:hover { background: var(--danger); color: var(--surface); }
+.stop kbd { margin-left: 2px; }
+@media (max-width: 520px) { .topbar-in { flex-wrap: nowrap; gap: 10px; } .sound-state #soundLabel, .stop kbd { display: none; } .stop { padding: 0 12px; } }
+
+/* Shell */
+.shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 32px; max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; }
+.rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); }
+.step-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; background: none; border-radius: 10px; color: var(--muted); font: 15px var(--f-body); text-align: left; cursor: pointer; }
+.step-btn:hover { color: var(--ink); }
+.step-btn .num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 500 12px var(--f-mono); border: 1.5px solid var(--line); flex: none; }
+.step-btn .opt { margin-left: auto; font: 500 10px var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.8; }
+.step-btn.done .num { border-color: var(--ok); color: var(--ok); }
+.step-btn[aria-current="step"] { color: var(--ink); background: var(--surface); font-weight: 700; }
+.step-btn[aria-current="step"] .num { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rail-note { margin-top: 18px; padding: 0 10px; font-size: 13px; color: var(--muted); }
+@media (max-width: 880px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 18px; padding-block: 16px 48px; }
+  .rail ol { flex-direction: row; position: static; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+  .step-btn { width: auto; white-space: nowrap; }
+  .step-btn .opt, .rail-note { display: none; }
+}
+
+/* Panels */
+main { min-width: 0; max-width: 780px; }
+.panel { display: grid; gap: 20px; }
+.phead { display: grid; gap: 10px; }
+.eyebrow { font: 500 12px var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lead { font-size: 1.08rem; color: var(--muted); max-width: 64ch; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.box > p { max-width: 66ch; }
+.box.disabled { opacity: 0.55; pointer-events: none; }
+.box-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.note { display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); font-size: 0.93rem; }
+.note.danger { background: transparent; border: 1.5px solid var(--danger); }
+.note b { font-weight: 700; }
+.check { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 68ch; }
+.check li::marker { color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.actions .spacer { flex: 1; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); font: 700 15px var(--f-body); cursor: pointer; text-decoration: none; }
+.btn:hover { filter: brightness(1.08); }
+.btn.secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.btn.secondary:hover { border-color: var(--ink); filter: none; }
+.btn.ghost { background: transparent; color: var(--muted); border-color: transparent; }
+.btn.ghost:hover { color: var(--ink); filter: none; }
+.btn.small { min-height: 36px; padding: 0 12px; font-size: 14px; }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.btn svg { width: 14px; height: 14px; flex: none; }
+.btn.playing { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.btn.picked { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* Choice cards */
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.choice { position: relative; display: grid; gap: 4px; padding: 14px 14px 12px; border: 1.5px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--surface); }
+.choice:hover { border-color: var(--muted); }
+.choice input { position: absolute; opacity: 0; pointer-events: none; }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.choice:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.choice:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
+.choice .t { font-weight: 700; }
+.choice .d { font-size: 0.88rem; color: var(--muted); }
+.choice .btn { justify-self: start; margin-top: 6px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1.5px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; background: var(--sunk); }
+.seg label { position: relative; padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 14px; color: var(--muted); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--surface); color: var(--ink); font-weight: 700; }
+.seg label:has(input:focus-visible) { outline: 3px solid var(--accent); }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+/* Instrument readouts */
+.readout { background: var(--sunk); border-radius: 10px; padding: 14px 16px; font-family: var(--f-mono); font-variant-numeric: tabular-nums; display: grid; gap: 2px; min-width: 0; }
+.readout .big { font-size: clamp(2rem, 1.5rem + 2.4vw, 3rem); font-weight: 500; line-height: 1.1; letter-spacing: -0.02em; }
+.readout .sub { font-size: 13px; color: var(--muted); }
+.readout .lab { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+
+/* Level control */
+.level { display: grid; gap: 6px; }
+.level .lbl { font: 500 11px var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lv-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lv-row input[type=range] { flex: 1 1 160px; min-width: 120px; accent-color: var(--accent); height: 28px; }
+.nudge { min-width: 44px; min-height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 500 13px var(--f-mono); cursor: pointer; }
+.nudge:hover { border-color: var(--ink); }
+.level output { font: 13px var(--f-mono); font-variant-numeric: tabular-nums; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.level output b { color: var(--ink); font-weight: 500; font-size: 15px; }
+.level output .hot { color: var(--danger); }
+input[type=range].freq { width: 100%; accent-color: var(--accent); height: 28px; }
+
+/* Listening test */
+.listen { display: grid; gap: 14px; justify-items: center; text-align: center; padding: 24px 16px; border: 1.5px dashed var(--line); border-radius: var(--r); background: var(--bg); }
+.listen-status { font-size: 1rem; color: var(--muted); min-height: 1.6em; }
+.hear { width: min(100%, 340px); min-height: 104px; border-radius: 16px; border: 0; background: var(--accent); color: var(--accent-ink); font: 750 1.4rem var(--f-display); cursor: pointer; touch-action: manipulation; user-select: none; }
+.hear.pressed { animation: press 0.18s ease-out; }
+@keyframes press { 40% { transform: scale(0.96); } }
+.dots { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; max-width: 340px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); opacity: 0.5; }
+
+/* Chips */
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font: 500 12.5px var(--f-mono); background: var(--sunk); color: var(--muted); }
+.chip.ok { color: var(--ok); }
+.chip.warn { color: var(--danger); }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1.5px solid var(--line); }
+.tab { padding: 10px 14px; border: 0; background: none; font: 700 15px var(--f-body); color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1.5px; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+.progress { height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width 0.3s; }
+.ab { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ab .btn { min-height: 56px; }
+.oct { display: grid; gap: 8px; }
+.oct-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Chart */
+.chart { overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 480px; height: auto; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .ax { fill: var(--muted); font: 11px var(--f-mono); }
+.chart .axl { fill: var(--muted); font: 11px var(--f-mono); letter-spacing: 0.04em; }
+.chart .r { stroke: var(--right); fill: none; stroke-width: 2; }
+.chart .l { stroke: var(--left); fill: none; stroke-width: 2; }
+.chart .l.line { stroke-dasharray: 5 4; }
+.chart .tl { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 3 4; fill: none; }
+.chart .tm { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+.chart .tt { fill: var(--accent); font: 500 12px var(--f-mono); }
+.chart .empty { fill: var(--muted); font: 14px var(--f-body); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font: 13px var(--f-mono); color: var(--muted); }
+.legend span::before { content: attr(data-sym); margin-right: 6px; font-weight: 500; }
+.legend .lr::before { color: var(--right); }
+.legend .ll::before { color: var(--left); }
+.legend .lt::before { color: var(--accent); }
+
+/* Results */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.stat .lab { font: 500 11px var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.stat .val { font: 500 1.6rem var(--f-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.stat .val.none { color: var(--muted); }
+.stat .sub { font-size: 13px; color: var(--muted); }
+.findings { display: grid; gap: 10px; margin: 0; padding-left: 1.2em; max-width: 68ch; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font: 500 11px var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+td { font-variant-numeric: tabular-nums; }
+textarea.copy { width: 100%; min-height: 160px; font: 13px var(--f-mono); padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); }
+.countdown { font: 500 clamp(3rem, 2rem + 5vw, 4.5rem) var(--f-mono); font-variant-numeric: tabular-nums; text-align: center; letter-spacing: -0.03em; }
+
+.disclaimer { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 0 40px; color: var(--muted); font-size: 13px; }
+.disclaimer p { max-width: 90ch; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <svg viewBox="0 0 28 28" aria-hidden="true"><path class="w2" d="M3 14h4l2-6 3 12 3-14 3 16 2-8h5" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24.5" cy="14" r="2" class="w1" fill="none" stroke-width="2"/></svg>
+      Tinnitus Match
+    </div>
+    <div class="sound-state" id="soundState" aria-live="polite"><span class="dot"></span><span id="soundLabel">Silent</span></div>
+    <button type="button" class="stop" id="stopAll">Stop sound <kbd>Esc</kbd></button>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Test steps">
+    <ol id="stepNav"></ol>
+    <p class="rail-note">Your progress is saved in this browser. You can leave and come back.</p>
+  </nav>
+
+  <main id="main">
+
+    <!-- 1 SETUP -->
+    <section class="panel" data-step="setup" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Measure your tinnitus with headphones</h1>
+        <p class="lead">This follows the measurements an audiologist uses to describe tinnitus: its pitch, how loud it is, how much sound covers it, and whether it fades once that sound stops. Plan on 15 to 25 minutes in a quiet room.</p>
+      </header>
+
+      <div class="box">
+        <h2>Before you start</h2>
+        <ul class="check">
+          <li><b>Noise cancelling on, transparency off.</b> ANC blocks room noise. Turn off ambient, transparency and conversation modes.</li>
+          <li><b>Turn off sound processing.</b> Disable spatial audio, EQ presets, adaptive or personalised sound, and any volume limiter that changes levels on its own.</li>
+          <li><b>Wired is best.</b> Bluetooth works, but some connections drop sounds above about 15 kHz.</li>
+          <li><b>Set your computer volume to about half, then leave it alone.</b> Every level here is measured against that setting.</li>
+          <li><b>Expect your tinnitus to seem louder.</b> Silence and noise cancelling make it stand out, which helps matching. Some ANC headphones add a faint hiss of their own. Listen with nothing playing for a few seconds so you know what that sounds like.</li>
+        </ul>
+        <div class="note"><span>Press <b>Esc</b> or <b>Stop sound</b> at the top at any time. Levels are capped, but your volume setting decides how loud the cap is. If anything is uncomfortable, stop and turn it down.</span></div>
+      </div>
+
+      <div class="box">
+        <h2>Check left and right</h2>
+        <p class="muted">Play a beep in each ear. If they come out on the wrong side, swap your headphones or check the balance setting on your computer.</p>
+        <div class="row">
+          <button type="button" class="btn secondary" id="beepL">Beep left</button>
+          <button type="button" class="btn secondary" id="beepR">Beep right</button>
+          <button type="button" class="btn" id="lrStart">Quick check</button>
+        </div>
+        <div id="lrQuiz" class="row" hidden>
+          <span id="lrPrompt" class="muted"></span>
+          <button type="button" class="btn secondary small" data-lr="left">Left</button>
+          <button type="button" class="btn secondary small" data-lr="right">Right</button>
+        </div>
+        <p id="lrResult" aria-live="polite"></p>
+      </div>
+
+      <div class="box">
+        <h2>Set a comfortable level</h2>
+        <p class="muted">Play the 1 kHz reference tone and adjust it until it is clear and comfortable, about as loud as a quiet conversation. Never uncomfortable. This becomes the starting point and the soft ceiling for every other step.</p>
+        <div data-level="calibLevel" data-label="Reference tone level"></div>
+        <div class="row"><button type="button" class="btn secondary" id="calibPlay"></button></div>
+      </div>
+
+      <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-go="hearing" data-mark="setup">Continue</button></div>
+    </section>
+
+    <!-- 2 HEARING -->
+    <section class="panel" data-step="hearing" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Hearing check</h1>
+        <p class="lead">Finds the quietest beep you can hear at each frequency in each ear. Tinnitus often sits near a frequency where hearing has dipped, so this gives your pitch match some context.</p>
+      </header>
+      <div class="box">
+        <div class="note"><span>These levels are in decibels relative to your device's maximum output, not the dB HL of a clinic audiogram. Compare your ears and frequencies with each other. Most headphones also lose sensitivity above 8 kHz, so high-frequency results look worse for everyone.</span></div>
+        <div class="row">
+          <div class="seg" role="radiogroup" aria-label="Ears">
+            <label><input type="radio" name="hgEars" id="hgEarsBoth" value="both" checked>Both ears</label>
+            <label><input type="radio" name="hgEars" id="hgEarsL" value="left">Left</label>
+            <label><input type="radio" name="hgEars" id="hgEarsR" value="right">Right</label>
+          </div>
+          <div class="seg" role="radiogroup" aria-label="Frequency range">
+            <label><input type="radio" name="hgRange" id="hgRangeStd" value="std" checked>250 Hz to 8 kHz</label>
+            <label><input type="radio" name="hgRange" id="hgRangeExt" value="ext">Up to 16 kHz</label>
+          </div>
+        </div>
+        <p class="muted small" id="hgEstimate"></p>
+        <p class="small">You will hear three short beeps after a random pause. Press <b>I hear it</b> (or Space) as soon as you hear them, even if they are very faint. Don't press if you're unsure.</p>
+        <div class="row"><button type="button" class="btn" id="hgStart">Start hearing check</button><button type="button" class="btn ghost small" id="hgClear">Clear results</button></div>
+        <p id="hgProgress" class="muted" aria-live="polite"></p>
+        <div id="hgListen"></div>
+      </div>
+      <div class="box">
+        <div class="box-head"><h2>Your thresholds</h2><div class="legend"><span class="lr" data-sym="○">Right ear</span><span class="ll" data-sym="×">Left ear</span><span class="lt" data-sym="◆">Tinnitus</span></div></div>
+        <div class="chart" id="hgChart"></div>
+      </div>
+      <div class="actions"><button type="button" class="btn ghost" data-go="setup">Back</button><span class="spacer"></span><button type="button" class="btn secondary" data-go="describe">Skip</button><button type="button" class="btn" data-go="describe">Continue</button></div>
+    </section>
+
+    <!-- 3 DESCRIBE -->
+    <section class="panel" data-step="describe" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Describe your tinnitus</h1>
+        <p class="lead">Pick what is closest. You can come back and change it if a different sound matches better later.</p>
+      </header>
+      <div class="box">
+        <h2>Where do you hear it?</h2>
+        <div class="choices" id="earChoices">
+          <label class="choice"><input type="radio" name="tEar" id="tEarL" value="left"><span class="t">Left ear</span><span class="d">Mostly or only on the left</span></label>
+          <label class="choice"><input type="radio" name="tEar" id="tEarR" value="right"><span class="t">Right ear</span><span class="d">Mostly or only on the right</span></label>
+          <label class="choice"><input type="radio" name="tEar" id="tEarB" value="both"><span class="t">Both ears</span><span class="d">About the same on each side</span></label>
+          <label class="choice"><input type="radio" name="tEar" id="tEarH" value="head"><span class="t">Inside the head</span><span class="d">Central, hard to place</span></label>
+        </div>
+      </div>
+      <div class="box">
+        <h2>What does it sound like?</h2>
+        <div class="choices" id="typeChoices"></div>
+        <div class="note danger"><span><b>See a doctor if it beats in time with your pulse,</b> started suddenly, or came with sudden hearing loss, dizziness or one-sided symptoms. Those need a medical check, not just a sound match.</span></div>
+      </div>
+      <div class="box" id="presentBox">
+        <h2>Play the matching sounds in</h2>
+        <p class="muted">When tinnitus is on one side, clinics often play the matching sound in the other ear so it can't cover the tinnitus up. Start with the same ear. If the test sound seems to blend into your tinnitus, switch to the opposite ear.</p>
+        <div class="seg" role="radiogroup" aria-label="Presentation ear">
+          <label><input type="radio" name="tPresent" id="tPresSame" value="same">Same ear</label>
+          <label><input type="radio" name="tPresent" id="tPresOpp" value="opposite">Opposite ear</label>
+          <label><input type="radio" name="tPresent" id="tPresBoth" value="both">Both ears</label>
+        </div>
+      </div>
+      <div class="actions"><button type="button" class="btn ghost" data-go="hearing">Back</button><span class="spacer"></span><button type="button" class="btn" data-go="pitch" data-mark="describe">Continue</button></div>
+    </section>
+
+    <!-- 4 PITCH -->
+    <section class="panel" data-step="pitch" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Pitch match</h1>
+        <p class="lead">Find the frequency that sounds most like your tinnitus. Judge the pitch, not the loudness. If one sound is harder to hear, turn the level up a little.</p>
+      </header>
+      <div class="box">
+        <div class="row">
+          <span class="chip" id="pitchTypeChip"></span><span class="chip" id="pitchEarChip"></span>
+          <label class="toggle"><input type="checkbox" id="pitchPulsed" checked>Interrupt the sound so it stands apart from your tinnitus</label>
+        </div>
+        <div data-level="pitchLevel" data-label="Level"></div>
+      </div>
+
+      <div class="box">
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab" role="tab" id="tabGuided" aria-selected="true" aria-controls="pitchGuided">Guided search</button>
+          <button type="button" class="tab" role="tab" id="tabFine" aria-selected="false" aria-controls="pitchFine">Fine-tune</button>
+        </div>
+        <div id="pitchGuided" role="tabpanel" aria-labelledby="tabGuided" class="panel">
+          <p class="muted">Listen to A and B, then pick the one closer in pitch to your tinnitus. Each round narrows the range by half.</p>
+          <div class="row"><span class="chip" id="gRound"></span><span class="spacer"></span></div>
+          <div class="progress"><i id="gBar"></i></div>
+          <div class="ab">
+            <button type="button" class="btn secondary" id="gPlayA">Play A</button>
+            <button type="button" class="btn secondary" id="gPlayB">Play B</button>
+          </div>
+          <div class="ab">
+            <button type="button" class="btn" id="gPickA">A is closer</button>
+            <button type="button" class="btn" id="gPickB">B is closer</button>
+          </div>
+          <div class="row"><button type="button" class="btn ghost small" id="gSame">Can't tell</button><button type="button" class="btn ghost small" id="gRestart">Start over</button></div>
+          <p id="gResult" aria-live="polite"></p>
+        </div>
+        <div id="pitchFine" role="tabpanel" aria-labelledby="tabFine" class="panel" hidden>
+          <div class="readout"><span class="lab">Frequency</span><span class="big" id="fHz"></span><span class="sub" id="fNote"></span></div>
+          <input type="range" class="freq" id="fSlider" min="0" max="1000" step="1" aria-label="Frequency">
+          <div class="row">
+            <button type="button" class="nudge" data-st="-12">−1 oct</button>
+            <button type="button" class="nudge" data-st="-1">−1 st</button>
+            <button type="button" class="nudge" data-st="-0.25">−¼ st</button>
+            <button type="button" class="nudge" data-st="0.25">+¼ st</button>
+            <button type="button" class="nudge" data-st="1">+1 st</button>
+            <button type="button" class="nudge" data-st="12">+1 oct</button>
+          </div>
+          <div class="row"><button type="button" class="btn secondary" id="fPlay"></button></div>
+          <div class="oct">
+            <h3>Octave check</h3>
+            <p class="muted small">Pitches an octave apart are easy to confuse. Listen to all three and choose the closest. The order is shuffled.</p>
+            <div id="octRows" class="oct"></div>
+          </div>
+        </div>
+      </div>
+      <div class="actions"><button type="button" class="btn ghost" data-go="describe">Back</button><span class="spacer"></span><button type="button" class="btn" id="pitchSave">Save pitch</button></div>
+    </section>
+
+    <!-- 5 LOUDNESS -->
+    <section class="panel" data-step="loudness" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Loudness match</h1>
+        <p class="lead">First find the quietest level you can hear at your tinnitus pitch. Then raise the sound until it is as loud as your tinnitus. The difference is your tinnitus loudness in dB SL (decibels above your threshold).</p>
+      </header>
+      <div class="box" id="loudNeed" hidden><p>Do the pitch match first so this step knows which sound to use.</p><div class="row"><button type="button" class="btn" data-go="pitch">Go to pitch match</button></div></div>
+      <div class="box" id="loudA">
+        <div class="box-head"><h2>1. Threshold at <span id="loudFreq"></span></h2><span class="chip" id="loudThrChip"></span></div>
+        <p class="muted small">Three short beeps after a random pause. Press <b>I hear it</b> or Space as soon as you hear them.</p>
+        <div class="row"><button type="button" class="btn" id="loudThrStart">Find my threshold</button></div>
+        <div id="loudListen"></div>
+      </div>
+      <div class="box" id="loudB">
+        <h2>2. Match the loudness</h2>
+        <p class="muted">Play the sound and adjust it in small steps until it is equally loud as your tinnitus. If you can't decide, choose the level just before it got louder.</p>
+        <div class="readouts">
+          <div class="readout"><span class="lab">Tinnitus loudness</span><span class="big" id="loudSL">—</span><span class="sub">dB above your threshold</span></div>
+        </div>
+        <div data-level="loudLevel" data-label="Matching level"></div>
+        <div class="row"><button type="button" class="btn secondary" id="loudPlay"></button><label class="toggle"><input type="checkbox" id="loudPulsed" checked>Interrupt the sound</label></div>
+      </div>
+      <div class="actions"><button type="button" class="btn ghost" data-go="pitch">Back</button><span class="spacer"></span><button type="button" class="btn" id="loudSave">Save loudness</button></div>
+    </section>
+
+    <!-- 6 MASKING -->
+    <section class="panel" data-step="masking" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Minimum masking level</h1>
+        <p class="lead">How much noise does it take to cover your tinnitus completely? A low number suggests background sound may give you relief.</p>
+      </header>
+      <div class="box">
+        <div class="row">
+          <div class="seg" role="radiogroup" aria-label="Noise">
+            <label><input type="radio" name="mNoise" id="mNoiseW" value="white" checked>White noise</label>
+            <label><input type="radio" name="mNoise" id="mNoiseP" value="pink">Pink noise</label>
+          </div>
+          <span class="chip" id="maskEarChip"></span>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-head"><h2>1. Noise threshold</h2><span class="chip" id="maskThrChip"></span></div>
+        <p class="muted small">Short bursts of noise after a random pause. Press <b>I hear it</b> or Space when you hear them.</p>
+        <div class="row"><button type="button" class="btn" id="maskThrStart">Find my noise threshold</button></div>
+        <div id="maskListen"></div>
+      </div>
+      <div class="box" id="maskB">
+        <h2>2. Cover the tinnitus</h2>
+        <p class="muted">Start the noise, then raise it 1 dB at a time until you can no longer hear your tinnitus at all, not just less of it.</p>
+        <div class="readouts"><div class="readout"><span class="lab">Minimum masking level</span><span class="big" id="maskSL">—</span><span class="sub">dB above your noise threshold</span></div></div>
+        <div data-level="maskLevel" data-label="Noise level"></div>
+        <div class="row"><button type="button" class="btn secondary" id="maskPlay"></button></div>
+      </div>
+      <div class="actions"><button type="button" class="btn ghost" data-go="loudness">Back</button><span class="spacer"></span><button type="button" class="btn secondary" data-go="ri">Skip</button><button type="button" class="btn secondary" id="maskFail">Still hear it at the top</button><button type="button" class="btn" id="maskSave">Save: it's covered</button></div>
+    </section>
+
+    <!-- 7 RESIDUAL INHIBITION -->
+    <section class="panel" data-step="ri" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Residual inhibition</h1>
+        <p class="lead">Play noise slightly above your masking level for a minute, then stop. Many people find their tinnitus goes quiet or disappears for a while afterwards. How long it stays away is useful to know.</p>
+      </header>
+      <div class="box" id="riNeed" hidden><p>This uses your minimum masking level. Finish the masking step first, with a level that covered your tinnitus.</p><div class="row"><button type="button" class="btn" data-go="masking">Go to masking level</button></div></div>
+      <div class="box" id="riMain">
+        <div class="row">
+          <div class="seg" role="radiogroup" aria-label="Duration">
+            <label><input type="radio" name="riDur" id="riDur30" value="30">30 seconds</label>
+            <label><input type="radio" name="riDur" id="riDur60" value="60" checked>60 seconds</label>
+          </div>
+          <span class="chip" id="riLevelChip"></span>
+        </div>
+        <div class="countdown" id="riClock">1:00</div>
+        <p class="muted" id="riStatus" aria-live="polite" style="text-align:center">Pay attention to your tinnitus the moment the noise stops.</p>
+        <div class="row" style="justify-content:center"><button type="button" class="btn" id="riStart">Start noise</button><button type="button" class="btn secondary" id="riAbort" hidden>Stop early</button></div>
+        <div id="riAsk" hidden class="panel">
+          <h3 style="text-align:center">Right now, your tinnitus is…</h3>
+          <div class="choices">
+            <button type="button" class="btn secondary" data-ri="complete">Gone</button>
+            <button type="button" class="btn secondary" data-ri="partial">Quieter</button>
+            <button type="button" class="btn secondary" data-ri="none">Unchanged</button>
+            <button type="button" class="btn secondary" data-ri="rebound">Louder</button>
+          </div>
+        </div>
+        <div id="riWatch" hidden class="panel">
+          <p style="text-align:center">Keep listening. Press the button when your tinnitus is back to its usual loudness.</p>
+          <div class="row" style="justify-content:center"><button type="button" class="btn" id="riBack">It's back to normal</button></div>
+        </div>
+        <p id="riResult" aria-live="polite"></p>
+      </div>
+      <div class="actions"><button type="button" class="btn ghost" data-go="masking">Back</button><span class="spacer"></span><button type="button" class="btn secondary" data-go="results">Skip</button><button type="button" class="btn" data-go="results">See results</button></div>
+    </section>
+
+    <!-- 8 RESULTS -->
+    <section class="panel" data-step="results" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Your tinnitus profile</h1>
+        <p class="lead" id="resLead"></p>
+      </header>
+      <div class="stats" id="resStats"></div>
+      <div class="box">
+        <div class="box-head"><h2>Thresholds and match</h2><div class="legend"><span class="lr" data-sym="○">Right ear</span><span class="ll" data-sym="×">Left ear</span><span class="lt" data-sym="◆">Tinnitus</span></div></div>
+        <div class="chart" id="resChart"></div>
+      </div>
+      <div class="box">
+        <h2>What this suggests</h2>
+        <ul class="findings" id="resFindings"></ul>
+        <p class="muted small">Bring these numbers to an audiologist or ENT. They are useful for tracking change over time, but they are not a diagnosis.</p>
+      </div>
+      <div class="box">
+        <h2>Keep a record</h2>
+        <div class="row">
+          <button type="button" class="btn" id="resCopy">Copy summary</button>
+          <button type="button" class="btn secondary" id="resSave">Save to history</button>
+          <button type="button" class="btn ghost" id="resReset">Start a new session</button>
+        </div>
+        <div id="resResetConfirm" class="note" hidden><span>This clears the current results. Your comfort level, hearing check and saved history stay.</span><button type="button" class="btn small" id="resResetYes">Clear results</button><button type="button" class="btn ghost small" id="resResetNo">Keep them</button></div>
+        <p id="resMsg" class="small" aria-live="polite"></p>
+        <textarea class="copy" id="resText" readonly hidden aria-label="Summary text"></textarea>
+        <h3>History</h3>
+        <div class="table-wrap" id="resHistory"></div>
+      </div>
+      <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-go="relief">Try relief sounds</button></div>
+    </section>
+
+    <!-- 9 RELIEF -->
+    <section class="panel" data-step="relief" hidden>
+      <header class="phead">
+        <p class="eyebrow"></p>
+        <h1>Relief sounds</h1>
+        <p class="lead">Background sound makes tinnitus less noticeable for many people. Keep it a little quieter than your tinnitus so the two blend, rather than drowning it out.</p>
+      </header>
+      <div class="box">
+        <div class="choices">
+          <label class="choice"><input type="radio" name="rType" id="rTypeN" value="notched" checked><span class="t">Notched noise</span><span class="d">Pink noise with a one-octave gap around your tinnitus pitch</span></label>
+          <label class="choice"><input type="radio" name="rType" id="rTypeP" value="pink"><span class="t">Pink noise</span><span class="d">Even, like steady rain</span></label>
+          <label class="choice"><input type="radio" name="rType" id="rTypeB" value="brown"><span class="t">Brown noise</span><span class="d">Deep, like a distant waterfall</span></label>
+        </div>
+        <div id="rNotch" class="panel">
+          <div class="readout"><span class="lab">Gap centred on</span><span class="big" id="rHz"></span><span class="sub" id="rRange"></span></div>
+          <input type="range" class="freq" id="rSlider" min="0" max="1000" step="1" aria-label="Notch frequency">
+        </div>
+        <div data-level="reliefLevel" data-label="Level"></div>
+        <div class="row">
+          <button type="button" class="btn" id="rPlay"></button>
+          <div class="seg" role="radiogroup" aria-label="Timer">
+            <label><input type="radio" name="rTimer" id="rTimer0" value="0" checked>No timer</label>
+            <label><input type="radio" name="rTimer" id="rTimer15" value="15">15 min</label>
+            <label><input type="radio" name="rTimer" id="rTimer30" value="30">30 min</label>
+            <label><input type="radio" name="rTimer" id="rTimer60" value="60">60 min</label>
+          </div>
+          <span class="chip" id="rRemain" hidden></span>
+        </div>
+        <p class="muted small">Notched sound therapy has mixed evidence. Treat it as something to try, not a cure. Keep the level low and take breaks.</p>
+      </div>
+      <div class="actions"><button type="button" class="btn ghost" data-go="results">Back to results</button></div>
+    </section>
+
+  </main>
+</div>
+
+<footer class="disclaimer">
+  <p>Tinnitus Match is a self-check tool, not a medical device. Headphone output isn't calibrated, so levels are relative to your own setup. Repeat it with the same headphones and volume setting when comparing over time. For persistent or bothersome tinnitus, see an audiologist or ENT.</p>
+</footer>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- constants & helpers ---------- */
+const KEY = 'tinnitus-match:v1', HKEY = 'tinnitus-match:v1:history';
+const FMIN = 100, FMAX = 16000, DB_MIN = -120, MAX_TONE = -10, MAX_NOISE = -15;
+const STEPS = [
+  { id: 'setup', name: 'Headphones & level' },
+  { id: 'hearing', name: 'Hearing check', optional: true },
+  { id: 'describe', name: 'Describe it' },
+  { id: 'pitch', name: 'Pitch match' },
+  { id: 'loudness', name: 'Loudness match' },
+  { id: 'masking', name: 'Masking level', optional: true },
+  { id: 'ri', name: 'Residual inhibition', optional: true },
+  { id: 'results', name: 'Results' },
+  { id: 'relief', name: 'Relief sounds' }
+];
+const TYPES = {
+  tone:  { label: 'Tone',        desc: 'Ringing, whistling, a steady “eeee”', demo: 4000 },
+  hiss:  { label: 'Narrow hiss', desc: 'Sizzling, steam, a hissing kettle', demo: 4000 },
+  wide:  { label: 'Wide hiss',   desc: 'Rushing air, static, “shhhh”', demo: 3000 },
+  buzz:  { label: 'Buzz',        desc: 'Electrical hum, drone, insects', demo: 160 },
+  pulse: { label: 'Pulsing tone', desc: 'A tone that flutters or throbs', demo: 4000 }
+};
+const NOTE_NAMES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const dbToGain = d => Math.pow(10, d / 20);
+const minus = n => (n < 0 ? '−' : '') + Math.abs(n);
+const fmtDb = d => minus(Math.round(d)) + ' dB';
+const fmtHz = f => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 1 : 2).replace(/\.?0+$/, '') + ' kHz' : Math.round(f) + ' Hz';
+const fmtHzLong = f => Math.round(f).toLocaleString('en-US') + ' Hz';
+const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+const isNoise = t => ['white', 'pink', 'brown', 'notched', 'hiss', 'wide'].includes(t);
+const maxFor = t => isNoise(t) ? MAX_NOISE : MAX_TONE;
+const earName = e => ({ left: 'Left', right: 'Right', both: 'Both ears', head: 'Inside the head' })[e] || e;
+const posToF = p => FMIN * Math.pow(FMAX / FMIN, p / 1000);
+const fToPos = f => Math.round(1000 * Math.log(f / FMIN) / Math.log(FMAX / FMIN));
+function noteName(f) {
+  const x = 69 + 12 * Math.log2(f / 440), m = Math.round(x), c = Math.round(100 * (x - m));
+  return NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1) + (c ? ` ${c > 0 ? '+' : '−'}${Math.abs(c)}¢` : '');
+}
+const ICON = {
+  play: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z" fill="currentColor"/></svg>',
+  stop: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg>'
+};
+
+/* ---------- state ---------- */
+function freshState() {
+  return { calib: -40, ear: 'both', type: 'tone', present: 'same', audiogram: { left: {}, right: {} },
+           pitch: null, loud: null, mml: null, ri: null, marks: {}, step: 'setup' };
+}
+let S = freshState();
+try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(freshState(), JSON.parse(raw)); } catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+function loadHistory() { try { return JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch (e) { return []; } }
+function saveHistory(h) { try { localStorage.setItem(HKEY, JSON.stringify(h)); return true; } catch (e) { return false; } }
+const tinnitusEars = () => (S.ear === 'left' || S.ear === 'right') ? S.ear : 'both';
+function presentEar() {
+  if (S.ear === 'left' || S.ear === 'right') {
+    if (S.present === 'opposite') return S.ear === 'left' ? 'right' : 'left';
+    if (S.present === 'both') return 'both';
+    return S.ear;
+  }
+  return 'both';
+}
+const presentLabel = e => e === 'both' ? 'Both ears' : earName(e) + ' ear';
+
+/* ---------- audio engine ---------- */
+const Engine = (() => {
+  let ctx = null, merger = null;
+  const bufs = {}, voices = new Set(), subs = new Set();
+  function ensure() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
+      merger = ctx.createChannelMerger(2);
+      merger.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  const emit = () => subs.forEach(f => f(voices.size));
+  const hold = (p, t) => p.cancelAndHoldAtTime ? p.cancelAndHoldAtTime(t) : p.cancelScheduledValues(t);
+  function gauss() { let u = 0; while (u === 0) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); }
+  function noise(kind) {
+    if (bufs[kind]) return bufs[kind];
+    const sr = ctx.sampleRate, len = Math.floor(sr * 6), N = Math.floor(sr * 0.05), x = new Float32Array(len + N);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
+    for (let i = 0; i < x.length; i++) {
+      const w = gauss();
+      if (kind === 'pink') {
+        b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+        b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+        x[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362; b6 = w * 0.115926;
+      } else if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; x[i] = last; }
+      else x[i] = w;
+    }
+    const b = ctx.createBuffer(1, len, sr), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = x[i];
+    for (let i = 0; i < N; i++) { const t = i / N; d[i] = x[i] * t + x[len + i] * (1 - t); } // seamless loop
+    let s = 0; for (let i = 0; i < len; i++) s += d[i] * d[i];
+    const k = 0.25 / Math.sqrt(s / len);
+    for (let i = 0; i < len; i++) d[i] *= k;
+    return (bufs[kind] = b);
+  }
+  // Level is roughly dB RMS re full scale; `comp` normalises each sound type to RMS 1 at 0 dB.
+  function voice(o) {
+    ensure();
+    const now = ctx.currentTime;
+    const out = ctx.createGain(), gate = ctx.createGain(), gL = ctx.createGain(), gR = ctx.createGain();
+    out.gain.value = 0; gate.gain.value = o.gate ?? 1;
+    out.connect(gate); gate.connect(gL); gate.connect(gR);
+    gL.connect(merger, 0, 0); gR.connect(merger, 0, 1);
+    const srcs = [], type = o.type || 'tone';
+    let freq = o.freq || 1000, db = o.db ?? -40, comp = () => 1, retune = () => {};
+    const osc = (t, f) => { const n = ctx.createOscillator(); n.type = t; n.frequency.value = f; srcs.push(n); return n; };
+    const buf = k => { const n = ctx.createBufferSource(); n.buffer = noise(k); n.loop = true; srcs.push(n); return n; };
+    const filt = (t, f, q) => { const n = ctx.createBiquadFilter(); n.type = t; n.frequency.value = f; n.Q.value = q; return n; };
+    const glide = (p, f) => p.setTargetAtTime(f, ctx.currentTime, 0.01);
+    if (type === 'tone' || type === 'buzz') {
+      const n = osc(type === 'tone' ? 'sine' : 'sawtooth', freq); n.connect(out);
+      const c = type === 'tone' ? Math.SQRT2 : Math.sqrt(3); comp = () => c;
+      retune = f => glide(n.frequency, f);
+    } else if (type === 'pulse') {
+      const n = osc('sine', freq), am = ctx.createGain(), lfo = osc('sine', 4), depth = ctx.createGain();
+      am.gain.value = 0.5; depth.gain.value = 0.5;
+      lfo.connect(depth); depth.connect(am.gain); n.connect(am); am.connect(out);
+      comp = () => Math.SQRT2 / Math.sqrt(0.375);
+      retune = f => glide(n.frequency, f);
+    } else if (type === 'hiss' || type === 'wide') {
+      const q = type === 'hiss' ? 4.32 : 1.41; // 1/3 octave or 1 octave band
+      const n = buf('white'), f1 = filt('bandpass', freq, q), f2 = filt('bandpass', freq, q);
+      n.connect(f1); f1.connect(f2); f2.connect(out);
+      comp = () => 4 * Math.sqrt((ctx.sampleRate / 2) / ((Math.PI / 4) * (freq / q)));
+      retune = f => { glide(f1.frequency, f); glide(f2.frequency, f); };
+    } else if (type === 'notched') {
+      const n = buf('pink'), sum = ctx.createGain(), lo = [], hi = [];
+      let a = n, b = n;
+      for (let i = 0; i < 4; i++) {
+        const l = filt('lowpass', freq / Math.SQRT2, 0.707); a.connect(l); a = l; lo.push(l);
+        const h = filt('highpass', freq * Math.SQRT2, 0.707); b.connect(h); b = h; hi.push(h);
+      }
+      a.connect(sum); b.connect(sum); sum.connect(out);
+      comp = () => 4;
+      retune = f => { lo.forEach(x => glide(x.frequency, f / Math.SQRT2)); hi.forEach(x => glide(x.frequency, f * Math.SQRT2)); };
+    } else {
+      buf(type).connect(out); comp = () => 4;
+    }
+    const setEar = e => { gL.gain.value = e === 'right' ? 0 : 1; gR.gain.value = e === 'left' ? 0 : 1; };
+    setEar(o.ear || 'both');
+    const apply = (tc = 0.02) => out.gain.setTargetAtTime(dbToGain(db) * comp(), ctx.currentTime, tc);
+    srcs.forEach(s => s.start(now));
+    apply(0.015);
+
+    let pulseTimer = null, nextT = 0, on = false;
+    function pump() {
+      while (nextT < ctx.currentTime + 1.2) {
+        on = !on; gate.gain.setTargetAtTime(on ? 1 : 0, nextT, 0.01); nextT += on ? 0.45 : 0.3;
+      }
+    }
+    function setPulsed(p) {
+      clearInterval(pulseTimer); pulseTimer = null;
+      hold(gate.gain, ctx.currentTime);
+      if (p) { on = false; nextT = ctx.currentTime + 0.03; pump(); pulseTimer = setInterval(pump, 250); }
+      else gate.gain.setTargetAtTime(1, ctx.currentTime, 0.01);
+    }
+    if (o.pulsed) setPulsed(true);
+
+    let stopped = false;
+    const v = {
+      gate: gate.gain,
+      get freq() { return freq; },
+      setFreq(f) { freq = f; retune(f); apply(); },
+      setDb(d) { db = d; apply(); },
+      setEar, setPulsed,
+      stop() {
+        if (stopped) return; stopped = true;
+        clearInterval(pulseTimer);
+        const t = ctx.currentTime;
+        hold(out.gain, t); out.gain.setTargetAtTime(0, t, 0.012);
+        srcs.forEach(s => { try { s.stop(t + 0.12); } catch (e) {} });
+        setTimeout(() => { try { gL.disconnect(); gR.disconnect(); } catch (e) {} }, 400);
+        voices.delete(v); emit();
+        if (o.onStop) o.onStop();
+      }
+    };
+    voices.add(v); emit();
+    return v;
+  }
+  return {
+    ensure, voice,
+    now: () => ctx ? ctx.currentTime : 0,
+    stopAll() { [...voices].forEach(v => v.stop()); },
+    onChange(f) { subs.add(f); }
+  };
+})();
+
+/* ---------- UI building blocks ---------- */
+function levelCtl(id, o) {
+  const host = $(`[data-level="${id}"]`);
+  host.outerHTML = `<div class="level" id="${id}"><span class="lbl">${host.dataset.label || 'Level'}</span>
+    <div class="lv-row"><button type="button" class="nudge" data-d="-5" aria-label="Down 5 dB">−5</button><button type="button" class="nudge" data-d="-1" aria-label="Down 1 dB">−1</button>
+    <input type="range" id="${id}-r" step="1" aria-label="${host.dataset.label || 'Level'}">
+    <button type="button" class="nudge" data-d="1" aria-label="Up 1 dB">+1</button><button type="button" class="nudge" data-d="5" aria-label="Up 5 dB">+5</button></div>
+    <output id="${id}-o"></output></div>`;
+  const el = document.getElementById(id), r = el.querySelector('input'), out = el.querySelector('output');
+  let v = o.value;
+  const show = () => { r.min = o.min; r.max = o.max; r.value = v; out.innerHTML = `<b>${fmtDb(v)}</b>${o.note ? o.note(v) : ''}`; };
+  const set = (x, fire = true) => { v = clamp(Math.round(x), o.min, o.max); show(); if (fire && o.onChange) o.onChange(v); };
+  r.addEventListener('input', () => set(+r.value));
+  $$('.nudge', el).forEach(b => b.addEventListener('click', () => set(v + +b.dataset.d)));
+  show();
+  return { get value() { return v; }, set, range(mi, ma) { o.min = mi; o.max = ma; set(v, false); }, refresh: show };
+}
+function comfortNote(v) {
+  const d = v - S.calib;
+  if (d > 5) return `<span class="hot">${d} dB above your comfort level</span>`;
+  if (d >= 0) return `<span>${d ? d + ' dB above' : 'at'} your comfort level</span>`;
+  return `<span>${-d} dB below your comfort level</span>`;
+}
+function playToggle(btn, make, label = 'Play') {
+  let v = null;
+  const sync = () => {
+    btn.innerHTML = v ? `${ICON.stop}Stop` : `${ICON.play}${label}`;
+    btn.classList.toggle('playing', !!v); btn.setAttribute('aria-pressed', String(!!v));
+  };
+  btn.addEventListener('click', () => {
+    if (v) v.stop();
+    else { Engine.stopAll(); v = make(() => { v = null; sync(); }); }
+    sync();
+  });
+  sync();
+  return { get voice() { return v; }, stop() { if (v) v.stop(); } };
+}
+function playFor(opts, secs) {
+  Engine.stopAll();
+  const v = Engine.voice(opts);
+  setTimeout(() => v.stop(), secs * 1000);
+  return v;
+}
+
+/* ---------- listening (threshold) test: simplified Hughson-Westlake, 10 down / 5 up ---------- */
+let activeTest = null;
+function listenTest(host, o) {
+  return new Promise(resolve => {
+    Engine.stopAll();
+    host.innerHTML = `<div class="listen"><span class="chip">${o.label}</span>
+      <p class="listen-status" aria-live="polite">Get ready…</p>
+      <button type="button" class="hear">I hear it<kbd>Space</kbd></button>
+      <div class="dots" aria-hidden="true"></div>
+      <button type="button" class="btn ghost small">Cancel</button></div>`;
+    const status = $('.listen-status', host), hear = $('.hear', host), dots = $('.dots', host), cancel = $('.btn', host);
+    const max = o.max, min = DB_MIN, hits = {}, log = [];
+    let L = Math.round(clamp(o.start, min, max)), first = true, prevHeard = null, n = 0, atMin = 0, atMax = 0, cur = null, done = false, early = 0;
+    function finish(res) {
+      if (done) return; done = true;
+      if (cur) { clearTimeout(cur.timer); cur.v.stop(); cur = null; }
+      activeTest = null; updateSound(); host.innerHTML = ''; resolve(res);
+    }
+    function press() {
+      hear.classList.remove('pressed'); void hear.offsetWidth; hear.classList.add('pressed');
+      if (!cur) return;
+      const t = performance.now();
+      if (t < cur.winStart) {
+        clearTimeout(cur.timer); cur.v.stop(); cur = null; early++;
+        status.textContent = early > 3 ? 'Too early again. Only press once you actually hear the beeps.' : 'Too early. Wait for the beeps, then press.';
+        setTimeout(() => trial(true), 1500);
+      } else if (t <= cur.winEnd) cur.heard = true;
+    }
+    hear.addEventListener('click', press);
+    cancel.addEventListener('click', () => finish(null));
+    activeTest = { press, cancel: () => finish(null) };
+    updateSound();
+    hear.focus();
+    function trial(repeat) {
+      if (done) return;
+      if (!repeat) n++;
+      if (n > (o.maxTrials || 28)) return finish(estimate());
+      status.textContent = `Trial ${n} · listening…`;
+      const delay = 0.8 + Math.random() * 1.8, on = 0.25, per = 0.45;
+      const v = Engine.voice({ type: o.type, freq: o.freq, ear: o.ear, db: L, gate: 0 });
+      const t0 = Engine.now() + delay;
+      for (let k = 0; k < 3; k++) { v.gate.setTargetAtTime(1, t0 + k * per, 0.008); v.gate.setTargetAtTime(0, t0 + k * per + on, 0.008); }
+      const p0 = performance.now() + delay * 1000;
+      cur = { v, heard: false, winStart: p0 + 80, winEnd: p0 + (2 * per + on) * 1000 + 1400 };
+      cur.timer = setTimeout(evaluate, cur.winEnd - performance.now() + 30);
+    }
+    function evaluate() {
+      const heard = cur.heard; cur.v.stop(); cur = null;
+      log.push([L, heard]); dots.insertAdjacentHTML('beforeend', '<i></i>');
+      if (heard) {
+        if (L <= min && ++atMin >= 2) return finish({ db: min, floor: true, trials: n });
+        if (!first && prevHeard === false) {
+          hits[L] = (hits[L] || 0) + 1;
+          if (hits[L] >= 2) return finish({ db: L, trials: n });
+        }
+        first = false; prevHeard = true; L = Math.max(min, L - 10);
+      } else {
+        if (L >= max && ++atMax >= 2) return finish({ db: null, none: true, trials: n });
+        prevHeard = false; L = Math.min(max, L + (first ? 10 : 5));
+      }
+      setTimeout(() => trial(false), 450);
+    }
+    function estimate() {
+      const ks = Object.keys(hits).map(Number);
+      if (ks.length) return { db: Math.min(...ks), approx: true, trials: n };
+      const h = log.filter(x => x[1]).map(x => x[0]);
+      return h.length ? { db: Math.min(...h), approx: true, trials: n } : { db: null, none: true, trials: n };
+    }
+    setTimeout(() => trial(false), 700);
+  });
+}
+
+/* ---------- sound status + global keys ---------- */
+const soundState = $('#soundState'), soundLabel = $('#soundLabel');
+let voiceCount = 0;
+function updateSound() {
+  const on = voiceCount > 0 || !!activeTest;
+  soundState.classList.toggle('on', on);
+  soundLabel.textContent = activeTest ? 'Test running' : on ? 'Sound on' : 'Silent';
+}
+Engine.onChange(n => { voiceCount = n; updateSound(); });
+function stopEverything() {
+  if (activeTest) activeTest.cancel();
+  Engine.stopAll();
+  riCancel();
+  reliefTimerClear();
+}
+$('#stopAll').addEventListener('click', stopEverything);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { stopEverything(); return; }
+  if (activeTest && (e.code === 'Space' || e.key === ' ')) {
+    e.preventDefault();
+    if (!e.repeat) activeTest.press();
+  }
+}, true);
+document.addEventListener('keyup', e => { if (activeTest && (e.code === 'Space' || e.key === ' ')) e.preventDefault(); }, true);
+
+/* ---------- navigation ---------- */
+const nav = $('#stepNav');
+nav.innerHTML = STEPS.map((s, i) => `<li><button type="button" class="step-btn" data-nav="${s.id}"><span class="num">${i + 1}</span><span class="name">${s.name}</span>${s.optional ? '<span class="opt">optional</span>' : ''}</button></li>`).join('');
+function isDone(id) {
+  switch (id) {
+    case 'setup': return !!S.marks.setup;
+    case 'hearing': return Object.keys(S.audiogram.left).length + Object.keys(S.audiogram.right).length > 0;
+    case 'describe': return !!S.marks.describe;
+    case 'pitch': return !!S.pitch;
+    case 'loudness': return !!S.loud;
+    case 'masking': return !!S.mml;
+    case 'ri': return !!S.ri;
+    default: return false;
+  }
+}
+function renderNav() {
+  $$('.step-btn', nav).forEach(b => {
+    const id = b.dataset.nav;
+    b.classList.toggle('done', isDone(id));
+    if (id === S.step) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+    $('.num', b).textContent = isDone(id) && id !== S.step ? '✓' : STEPS.findIndex(s => s.id === id) + 1;
+  });
+}
+const enterHooks = {};
+function go(id) {
+  if (!STEPS.some(s => s.id === id)) id = 'setup';
+  stopEverything();
+  S.step = id; save();
+  $$('.panel[data-step]').forEach(p => { p.hidden = p.dataset.step !== id; });
+  renderNav();
+  if (enterHooks[id]) enterHooks[id]();
+  const cur = $(`.step-btn[data-nav="${id}"]`); if (cur && cur.scrollIntoView && window.matchMedia('(max-width: 880px)').matches) cur.scrollIntoView({ block: 'nearest', inline: 'center' });
+  window.scrollTo({ top: 0 });
+  try { history.replaceState(null, '', '#' + id); } catch (e) {}
+}
+document.addEventListener('click', e => {
+  const n = e.target.closest('[data-nav]'); if (n) return go(n.dataset.nav);
+  const g = e.target.closest('[data-go]');
+  if (g) { if (g.dataset.mark) { S.marks[g.dataset.mark] = true; save(); } go(g.dataset.go); }
+});
+$$('.panel[data-step]').forEach(p => {
+  const i = STEPS.findIndex(s => s.id === p.dataset.step);
+  $('.eyebrow', p).textContent = `Step ${i + 1} of ${STEPS.length}${STEPS[i].optional ? ' · Optional' : ''}`;
+});
+
+/* ---------- 1. setup ---------- */
+function beep(ear, secs = 0.6) { playFor({ type: 'tone', freq: 1000, ear, db: S.calib }, secs); }
+$('#beepL').addEventListener('click', () => beep('left'));
+$('#beepR').addEventListener('click', () => beep('right'));
+let lr = null;
+function lrNext() {
+  lr.side = Math.random() < 0.5 ? 'left' : 'right';
+  $('#lrPrompt').textContent = `Beep ${lr.i + 1} of 3: which side was it?`;
+  setTimeout(() => beep(lr.side, 0.7), 350);
+}
+$('#lrStart').addEventListener('click', () => { lr = { i: 0, right: 0 }; $('#lrQuiz').hidden = false; $('#lrResult').textContent = ''; lrNext(); });
+$$('[data-lr]').forEach(b => b.addEventListener('click', () => {
+  if (!lr) return;
+  if (b.dataset.lr === lr.side) lr.right++;
+  lr.i++;
+  if (lr.i < 3) return lrNext();
+  $('#lrQuiz').hidden = true;
+  $('#lrResult').innerHTML = lr.right === 3
+    ? '<span class="chip ok">3 of 3 correct</span> Left and right are the right way round.'
+    : `<span class="chip warn">${lr.right} of 3 correct</span> Check that the L side of your headphones is on your left ear and your balance is centred, then try again.`;
+  lr = null;
+}));
+const calibLevel = levelCtl('calibLevel', { min: -90, max: -10, value: S.calib, onChange: v => { S.calib = v; save(); if (calibPlay.voice) calibPlay.voice.setDb(v); },
+  note: v => v > -20 ? '<span class="hot">This is near the top of the range. Turn your computer volume up a little instead.</span>' : '' });
+const calibPlay = playToggle($('#calibPlay'), onStop => Engine.voice({ type: 'tone', freq: 1000, ear: 'both', db: S.calib, onStop }), 'Play reference tone');
+
+/* ---------- 2. hearing check ---------- */
+const HG_STD = [1000, 2000, 4000, 6000, 8000, 500, 250];
+const HG_EXT = [1000, 2000, 3000, 4000, 6000, 8000, 10000, 12000, 14000, 16000, 500, 250];
+function hgPlan() {
+  const ears = $('input[name=hgEars]:checked').value, ext = $('input[name=hgRange]:checked').value === 'ext';
+  return { ears: ears === 'both' ? ['right', 'left'] : [ears], freqs: ext ? HG_EXT : HG_STD };
+}
+function hgEstimate() { const p = hgPlan(), n = p.ears.length * p.freqs.length; $('#hgEstimate').textContent = `${n} tones, roughly ${Math.round(n * 0.6)}–${Math.round(n * 0.9)} minutes.`; }
+$$('input[name=hgEars], input[name=hgRange]').forEach(r => r.addEventListener('change', hgEstimate));
+let hgRunning = false;
+$('#hgStart').addEventListener('click', async () => {
+  if (hgRunning) return;
+  hgRunning = true; $('#hgStart').disabled = true;
+  const p = hgPlan(), total = p.ears.length * p.freqs.length;
+  let i = 0, stopped = false;
+  for (const ear of p.ears) {
+    let start = S.calib - 20;
+    for (const f of p.freqs) {
+      i++;
+      $('#hgProgress').textContent = `${earName(ear)} ear · ${fmtHz(f)} · ${i} of ${total}`;
+      const res = await listenTest($('#hgListen'), { label: `${earName(ear)} ear · ${fmtHz(f)}`, type: 'tone', freq: f, ear, start, max: MAX_TONE, maxTrials: 24 });
+      if (res === null) { stopped = true; break; }
+      S.audiogram[ear][f] = res.none ? null : res.db;
+      save(); drawChart($('#hgChart')); renderNav();
+      if (res.db != null) start = Math.min(res.db + 20, MAX_TONE);
+    }
+    if (stopped) break;
+  }
+  $('#hgProgress').textContent = stopped ? 'Stopped. Results so far are saved.' : 'Done. Your thresholds are below.';
+  hgRunning = false; $('#hgStart').disabled = false;
+});
+$('#hgClear').addEventListener('click', () => { S.audiogram = { left: {}, right: {} }; save(); drawChart($('#hgChart')); renderNav(); $('#hgProgress').textContent = 'Cleared.'; });
+enterHooks.hearing = () => { hgEstimate(); drawChart($('#hgChart')); };
+
+/* ---------- chart ---------- */
+function drawChart(host) {
+  const W = 640, H = 340, m = { l: 58, r: 20, t: 30, b: 46 };
+  const span = Math.log2(FMAX / FMIN), fx = f => m.l + Math.log2(f / FMIN) / span * (W - m.l - m.r);
+  const ag = S.audiogram, vals = [];
+  ['left', 'right'].forEach(e => Object.values(ag[e]).forEach(v => { if (v != null) vals.push(v); }));
+  if (S.loud) vals.push(S.loud.match, S.loud.threshold);
+  let lo = -110, hi = -30;
+  if (vals.length) { lo = Math.floor((Math.min(...vals) - 10) / 10) * 10; hi = Math.ceil((Math.max(...vals) + 10) / 10) * 10; if (hi - lo < 40) hi = lo + 40; }
+  const fy = d => m.t + (d - lo) / (hi - lo) * (H - m.t - m.b);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Hearing thresholds by frequency">`;
+  for (let d = lo; d <= hi; d += 10) s += `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${fy(d)}" y2="${fy(d)}"/><text class="ax" x="${m.l - 8}" y="${fy(d) + 4}" text-anchor="end">${minus(d)}</text>`;
+  [[125, '125'], [250, '250'], [500, '500'], [1000, '1k'], [2000, '2k'], [4000, '4k'], [8000, '8k'], [16000, '16k']].forEach(([f, t]) => {
+    s += `<line class="grid" x1="${fx(f)}" x2="${fx(f)}" y1="${m.t}" y2="${H - m.b}"/><text class="ax" x="${fx(f)}" y="${H - m.b + 18}" text-anchor="middle">${t}</text>`;
+  });
+  s += `<text class="axl" x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">FREQUENCY (Hz)</text>`;
+  s += `<text class="axl" transform="translate(14 ${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle">LEVEL (dB re full scale) · better ↑</text>`;
+  const series = (ear, cls) => {
+    const pts = Object.keys(ag[ear]).map(Number).sort((a, b) => a - b);
+    const heard = pts.filter(f => ag[ear][f] != null);
+    if (heard.length > 1) s += `<polyline class="${cls} line" points="${heard.map(f => fx(f) + ',' + fy(ag[ear][f])).join(' ')}"/>`;
+    pts.forEach(f => {
+      const nr = ag[ear][f] == null, x = fx(f), y = nr ? H - m.b - 10 : fy(ag[ear][f]);
+      s += cls === 'r' ? `<circle class="r" cx="${x}" cy="${y}" r="6"/>` : `<path class="l" d="M${x - 5} ${y - 5}L${x + 5} ${y + 5}M${x + 5} ${y - 5}L${x - 5} ${y + 5}"/>`;
+      if (nr) s += `<path class="${cls}" d="M${x} ${y + 7}v8m-3 -3l3 3l3 -3"/>`;
+    });
+  };
+  series('right', 'r'); series('left', 'l');
+  if (S.pitch) {
+    const x = fx(S.pitch.freq);
+    s += `<line class="tl" x1="${x}" x2="${x}" y1="${m.t}" y2="${H - m.b}"/>`;
+    const anchor = x > W - 140 ? 'end' : 'start', dx = anchor === 'end' ? -6 : 6;
+    s += `<text class="tt" x="${x + dx}" y="${m.t - 10}" text-anchor="${anchor}">Tinnitus ${fmtHz(S.pitch.freq)}</text>`;
+    if (S.loud) { const y = fy(S.loud.match); s += `<path class="tm" d="M${x} ${y - 8}L${x + 8} ${y}L${x} ${y + 8}L${x - 8} ${y}Z"/>`; }
+  }
+  if (!vals.length && !S.pitch) s += `<text class="empty" x="${(m.l + W - m.r) / 2}" y="${(m.t + H - m.b) / 2}" text-anchor="middle">Run the hearing check to plot your thresholds here.</text>`;
+  host.innerHTML = s + '</svg>';
+}
+
+/* ---------- 3. describe ---------- */
+$('#typeChoices').innerHTML = Object.entries(TYPES).map(([k, t]) => `<label class="choice"><input type="radio" name="tType" id="tType-${k}" value="${k}"><span class="t">${t.label}</span><span class="d">${t.desc}</span><button type="button" class="btn secondary small" data-demo="${k}">${ICON.play}Hear it</button></label>`).join('');
+$$('[data-demo]').forEach(b => b.addEventListener('click', e => {
+  e.preventDefault();
+  const k = b.dataset.demo;
+  $(`#tType-${k}`).checked = true; S.type = k; save(); syncDescribe();
+  playFor({ type: k, freq: TYPES[k].demo, ear: presentEar(), db: S.calib - 10 }, 2.5);
+}));
+function syncDescribe() {
+  $$('input[name=tEar]').forEach(r => { r.checked = r.value === S.ear; });
+  $$('input[name=tType]').forEach(r => { r.checked = r.value === S.type; });
+  $$('input[name=tPresent]').forEach(r => { r.checked = r.value === S.present; });
+  $('#presentBox').hidden = !(S.ear === 'left' || S.ear === 'right');
+}
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.name === 'tEar') { S.ear = t.value; save(); syncDescribe(); }
+  if (t.name === 'tType') { if (S.type !== t.value) { S.type = t.value; save(); } }
+  if (t.name === 'tPresent') { S.present = t.value; save(); }
+});
+enterHooks.describe = syncDescribe;
+
+/* ---------- 4. pitch ---------- */
+const P = { freq: 4000, guided: null, octave: null, octChosen: false };
+const pitchLevel = levelCtl('pitchLevel', { min: -110, max: MAX_TONE, value: S.calib - 10, note: comfortNote,
+  onChange: v => { if (finePlay.voice) finePlay.voice.setDb(v); } });
+const pulsedP = () => $('#pitchPulsed').checked;
+$('#pitchPulsed').addEventListener('change', () => { if (finePlay.voice) finePlay.voice.setPulsed(pulsedP()); });
+function pitchVoice(f, onStop) { return Engine.voice({ type: S.type, freq: f, ear: presentEar(), db: pitchLevel.value, pulsed: pulsedP(), onStop }); }
+
+function gReset() {
+  const buzz = S.type === 'buzz';
+  P.guided = { f: buzz ? 250 : 2000, s: buzz ? 1.5 : 2, round: 1, rounds: 6 };
+  P.guidedType = S.type;
+  gRender();
+}
+const gPair = () => { const g = P.guided; return [clamp(g.f * Math.pow(2, -g.s), FMIN, FMAX), clamp(g.f * Math.pow(2, g.s), FMIN, FMAX)]; };
+function gRender() {
+  const g = P.guided, fin = g.round > g.rounds;
+  $('#gRound').textContent = fin ? 'Finished' : `Round ${g.round} of ${g.rounds}`;
+  $('#gBar').style.width = `${Math.min(1, (g.round - 1) / g.rounds) * 100}%`;
+  ['#gPlayA', '#gPlayB', '#gPickA', '#gPickB', '#gSame'].forEach(s => { $(s).disabled = fin; });
+  $('#gPlayA').innerHTML = `${ICON.play}Play A`; $('#gPlayB').innerHTML = `${ICON.play}Play B`;
+}
+function gPlay(which) {
+  const [a, b] = gPair(), f = which === 'A' ? a : b;
+  Engine.stopAll();
+  const btn = $(which === 'A' ? '#gPlayA' : '#gPlayB');
+  btn.classList.add('playing');
+  const v = pitchVoice(f, () => btn.classList.remove('playing'));
+  setTimeout(() => v.stop(), 2200);
+}
+function gPick(which) {
+  const g = P.guided, [a, b] = gPair();
+  Engine.stopAll();
+  if (which === 'A') g.f = a; else if (which === 'B') g.f = b;
+  g.s /= 2; g.round++;
+  if (g.round > g.rounds) {
+    setFineFreq(g.f);
+    $('#gResult').innerHTML = `Guided search landed on <b>${fmtHz(g.f)}</b>. Switching to fine-tune so you can refine it and run the octave check.`;
+    gRender();
+    setTimeout(() => setTab('fine'), 900);
+  } else gRender();
+}
+$('#gPlayA').addEventListener('click', () => gPlay('A'));
+$('#gPlayB').addEventListener('click', () => gPlay('B'));
+$('#gPickA').addEventListener('click', () => gPick('A'));
+$('#gPickB').addEventListener('click', () => gPick('B'));
+$('#gSame').addEventListener('click', () => gPick(null));
+$('#gRestart').addEventListener('click', () => { $('#gResult').textContent = ''; gReset(); });
+
+function setTab(t) {
+  Engine.stopAll();
+  const fine = t === 'fine';
+  $('#tabGuided').setAttribute('aria-selected', String(!fine)); $('#tabFine').setAttribute('aria-selected', String(fine));
+  $('#pitchGuided').hidden = fine; $('#pitchFine').hidden = !fine;
+  if (fine) renderOct();
+}
+$('#tabGuided').addEventListener('click', () => setTab('guided'));
+$('#tabFine').addEventListener('click', () => setTab('fine'));
+
+function setFineFreq(f, fromSlider) {
+  P.freq = clamp(f, FMIN, FMAX); P.octave = null; P.octChosen = false;
+  $('#fHz').textContent = fmtHzLong(P.freq);
+  $('#fNote').textContent = `${noteName(P.freq)} · ${TYPES[S.type].label}`;
+  if (!fromSlider) $('#fSlider').value = fToPos(P.freq);
+  if (finePlay.voice) finePlay.voice.setFreq(P.freq);
+  $('#pitchSave').innerHTML = `Save pitch: ${fmtHz(P.freq)}`;
+  if (!$('#pitchFine').hidden) renderOct();
+}
+$('#fSlider').addEventListener('input', e => setFineFreq(posToF(+e.target.value), true));
+$$('[data-st]').forEach(b => b.addEventListener('click', () => setFineFreq(P.freq * Math.pow(2, +b.dataset.st / 12))));
+const finePlay = playToggle($('#fPlay'), onStop => pitchVoice(P.freq, onStop));
+
+function renderOct() {
+  if (!P.octave) {
+    const base = P.freq, opts = [base / 2, base, base * 2].filter(f => f >= FMIN && f <= FMAX);
+    for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [opts[i], opts[j]] = [opts[j], opts[i]]; }
+    P.octave = opts;
+  }
+  $('#octRows').innerHTML = P.octave.map((f, i) => `<div class="oct-row"><button type="button" class="btn secondary small" data-oplay="${i}">${ICON.play}Option ${i + 1}</button><button type="button" class="btn ghost small${P.octChosen && Math.abs(f - P.freq) < 0.5 ? ' picked' : ''}" data-opick="${i}">This is closest</button></div>`).join('');
+  $$('[data-oplay]').forEach(b => b.addEventListener('click', () => {
+    Engine.stopAll(); b.classList.add('playing');
+    const v = pitchVoice(P.octave[+b.dataset.oplay], () => b.classList.remove('playing'));
+    setTimeout(() => v.stop(), 2200);
+  }));
+  $$('[data-opick]').forEach(b => b.addEventListener('click', () => {
+    const opts = P.octave, f = opts[+b.dataset.opick];
+    setFineFreq(f); P.octave = opts; P.octChosen = true; renderOct();
+  }));
+}
+$('#pitchSave').addEventListener('click', () => {
+  S.pitch = { freq: Math.round(P.freq), type: S.type, ear: presentEar(), octave: P.octChosen };
+  if (S.loud && S.loud.freq !== S.pitch.freq) S.loud = null;
+  save(); go('loudness');
+});
+enterHooks.pitch = () => {
+  $('#pitchTypeChip').textContent = TYPES[S.type].label;
+  $('#pitchEarChip').textContent = presentLabel(presentEar());
+  pitchLevel.range(-110, maxFor(S.type));
+  if (S.pitch && S.pitch.type === S.type) setFineFreq(S.pitch.freq); else setFineFreq(S.type === 'buzz' ? 160 : 4000);
+  if (!P.guided || P.guidedType !== S.type) gReset();
+  setTab(S.pitch ? 'fine' : 'guided');
+};
+
+/* ---------- 5. loudness ---------- */
+const loudLevel = levelCtl('loudLevel', { min: -120, max: MAX_TONE, value: S.calib - 20,
+  note: comfortNote,
+  onChange: v => { if (loudPlay.voice) loudPlay.voice.setDb(v); showSL(); } });
+let loudThr = null;
+function showSL() { $('#loudSL').textContent = loudThr == null ? '—' : minus(loudLevel.value - loudThr); }
+const loudPlay = playToggle($('#loudPlay'), onStop => Engine.voice({ type: S.pitch.type, freq: S.pitch.freq, ear: S.pitch.ear, db: loudLevel.value, pulsed: $('#loudPulsed').checked, onStop }));
+$('#loudPulsed').addEventListener('change', e => { if (loudPlay.voice) loudPlay.voice.setPulsed(e.target.checked); });
+function loudRender() {
+  $('#loudThrChip').textContent = loudThr == null ? 'Not measured' : `Threshold ${fmtDb(loudThr)}`;
+  $('#loudThrChip').className = 'chip' + (loudThr == null ? '' : ' ok');
+  $('#loudB').classList.toggle('disabled', loudThr == null);
+  $('#loudSave').disabled = loudThr == null;
+  $('#loudThrStart').textContent = loudThr == null ? 'Find my threshold' : 'Measure again';
+  showSL();
+}
+$('#loudThrStart').addEventListener('click', async () => {
+  const p = S.pitch;
+  $('#loudThrStart').disabled = true;
+  const res = await listenTest($('#loudListen'), { label: `${fmtHz(p.freq)} · ${presentLabel(p.ear)}`, type: p.type, freq: p.freq, ear: p.ear, start: S.calib - 20, max: maxFor(p.type) });
+  $('#loudThrStart').disabled = false;
+  if (!res) return;
+  if (res.none) { $('#loudThrChip').textContent = 'No response at the top level'; return; }
+  loudThr = res.db;
+  loudLevel.range(Math.max(DB_MIN, loudThr - 10), maxFor(p.type));
+  loudLevel.set(Math.min(loudThr + 10, maxFor(p.type)), false);
+  loudRender();
+});
+$('#loudSave').addEventListener('click', () => {
+  S.loud = { freq: S.pitch.freq, threshold: loudThr, match: loudLevel.value, sl: loudLevel.value - loudThr };
+  save(); go('masking');
+});
+enterHooks.loudness = () => {
+  const need = !S.pitch;
+  $('#loudNeed').hidden = !need; $('#loudA').hidden = need; $('#loudB').hidden = need; $('#loudSave').hidden = need;
+  if (need) return;
+  $('#loudFreq').textContent = fmtHz(S.pitch.freq);
+  loudThr = S.loud && S.loud.freq === S.pitch.freq ? S.loud.threshold : null;
+  loudLevel.range(loudThr == null ? DB_MIN : Math.max(DB_MIN, loudThr - 10), maxFor(S.pitch.type));
+  if (S.loud && loudThr != null) loudLevel.set(S.loud.match, false);
+  loudRender();
+};
+
+/* ---------- 6. masking ---------- */
+let maskThr = null;
+const maskNoise = () => $('input[name=mNoise]:checked').value;
+const maskLevel = levelCtl('maskLevel', { min: DB_MIN, max: MAX_NOISE, value: S.calib - 20, note: comfortNote,
+  onChange: v => { if (maskPlay.voice) maskPlay.voice.setDb(v); showMSL(); } });
+function showMSL() { $('#maskSL').textContent = maskThr == null ? '—' : minus(maskLevel.value - maskThr); }
+const maskPlay = playToggle($('#maskPlay'), onStop => Engine.voice({ type: maskNoise(), ear: tinnitusEars(), db: maskLevel.value, onStop }), 'Play noise');
+$$('input[name=mNoise]').forEach(r => r.addEventListener('change', () => { Engine.stopAll(); maskThr = null; maskRender(); }));
+function maskRender() {
+  $('#maskThrChip').textContent = maskThr == null ? 'Not measured' : `Threshold ${fmtDb(maskThr)}`;
+  $('#maskThrChip').className = 'chip' + (maskThr == null ? '' : ' ok');
+  $('#maskB').classList.toggle('disabled', maskThr == null);
+  $('#maskSave').disabled = $('#maskFail').disabled = maskThr == null;
+  $('#maskThrStart').textContent = maskThr == null ? 'Find my noise threshold' : 'Measure again';
+  showMSL();
+}
+$('#maskThrStart').addEventListener('click', async () => {
+  $('#maskThrStart').disabled = true;
+  const res = await listenTest($('#maskListen'), { label: `${maskNoise() === 'white' ? 'White' : 'Pink'} noise · ${presentLabel(tinnitusEars())}`, type: maskNoise(), ear: tinnitusEars(), start: S.calib - 25, max: MAX_NOISE });
+  $('#maskThrStart').disabled = false;
+  if (!res) return;
+  if (res.none) { $('#maskThrChip').textContent = 'No response at the top level'; return; }
+  maskThr = res.db;
+  maskLevel.range(Math.max(DB_MIN, maskThr - 5), MAX_NOISE);
+  maskLevel.set(Math.min(maskThr + 3, MAX_NOISE), false);
+  maskRender();
+});
+function maskStore(covered) {
+  S.mml = { noise: maskNoise(), ear: tinnitusEars(), threshold: maskThr, level: maskLevel.value, sl: maskLevel.value - maskThr, covered };
+  save(); go(covered ? 'ri' : 'results');
+}
+$('#maskSave').addEventListener('click', () => maskStore(true));
+$('#maskFail').addEventListener('click', () => maskStore(false));
+enterHooks.masking = () => {
+  $('#maskEarChip').textContent = presentLabel(tinnitusEars());
+  if (S.mml) {
+    $(S.mml.noise === 'pink' ? '#mNoiseP' : '#mNoiseW').checked = true;
+    maskThr = S.mml.threshold;
+    maskLevel.range(Math.max(DB_MIN, maskThr - 5), MAX_NOISE); maskLevel.set(S.mml.level, false);
+  }
+  maskRender();
+};
+
+/* ---------- 7. residual inhibition ---------- */
+let riTimer = null, riVoice = null, riWatchStart = 0, riLevel = 0, riCapped = false;
+function riCancel() {
+  if (riTimer) { clearInterval(riTimer); riTimer = null; }
+  if (riVoice) { riVoice.stop(); riVoice = null; }
+  if ($('#riAbort') && !$('#riAbort').hidden) { $('#riAbort').hidden = true; $('#riStart').hidden = false; $('#riStatus').textContent = 'Stopped. Start again when ready.'; }
+}
+const riDur = () => +$('input[name=riDur]:checked').value;
+$$('input[name=riDur]').forEach(r => r.addEventListener('change', () => { $('#riClock').textContent = fmtTime(riDur()); }));
+$('#riStart').addEventListener('click', () => {
+  stopEverything();
+  const dur = riDur(), t0 = performance.now();
+  $('#riAsk').hidden = true; $('#riWatch').hidden = true; $('#riResult').textContent = '';
+  riVoice = Engine.voice({ type: S.mml.noise, ear: S.mml.ear, db: riLevel });
+  $('#riStart').hidden = true; $('#riAbort').hidden = false;
+  $('#riStatus').textContent = 'Noise playing. Relax and keep still.';
+  riTimer = setInterval(() => {
+    const left = Math.max(0, dur - (performance.now() - t0) / 1000);
+    $('#riClock').textContent = fmtTime(Math.ceil(left));
+    if (left <= 0) {
+      clearInterval(riTimer); riTimer = null;
+      riVoice.stop(); riVoice = null;
+      $('#riAbort').hidden = true; $('#riStart').hidden = false; $('#riStart').textContent = 'Run again';
+      $('#riStatus').textContent = 'Noise stopped. Listen to your tinnitus now.';
+      $('#riAsk').hidden = false; riWatchStart = performance.now();
+    }
+  }, 200);
+});
+$('#riAbort').addEventListener('click', riCancel);
+$$('[data-ri]').forEach(b => b.addEventListener('click', () => {
+  const outcome = b.dataset.ri;
+  $('#riAsk').hidden = true;
+  if (outcome === 'complete' || outcome === 'partial') {
+    S.ri = { outcome, seconds: null, level: riLevel, duration: riDur() };
+    $('#riWatch').hidden = false;
+    clearInterval(riTimer);
+    riTimer = setInterval(() => { $('#riClock').textContent = fmtTime((performance.now() - riWatchStart) / 1000); }, 250);
+  } else {
+    S.ri = { outcome, seconds: 0, level: riLevel, duration: riDur() };
+    $('#riResult').innerHTML = outcome === 'none' ? 'Recorded: no change after the noise.' : 'Recorded: tinnitus louder after the noise. Mention this to your clinician.';
+    $('#riClock').textContent = fmtTime(riDur());
+  }
+  save(); renderNav();
+}));
+$('#riBack').addEventListener('click', () => {
+  clearInterval(riTimer); riTimer = null;
+  const secs = Math.round((performance.now() - riWatchStart) / 1000);
+  S.ri.seconds = secs; save(); renderNav();
+  $('#riWatch').hidden = true;
+  $('#riResult').innerHTML = `Recorded: <b>${S.ri.outcome === 'complete' ? 'complete' : 'partial'}</b> residual inhibition lasting <b>${fmtTime(secs)}</b>.`;
+});
+enterHooks.ri = () => {
+  const ok = S.mml && S.mml.covered;
+  $('#riNeed').hidden = !!ok; $('#riMain').hidden = !ok;
+  if (!ok) return;
+  const want = S.mml.level + 10, cap = Math.min(MAX_NOISE, S.calib + 10);
+  riLevel = Math.min(want, cap); riCapped = want > cap;
+  $('#riLevelChip').textContent = `${S.mml.noise === 'pink' ? 'Pink' : 'White'} noise at ${fmtDb(riLevel)}${riCapped ? ' (capped)' : ' · MML + 10 dB'}`;
+  $('#riClock').textContent = fmtTime(riDur());
+  $('#riStart').hidden = false; $('#riAbort').hidden = true; $('#riAsk').hidden = true; $('#riWatch').hidden = true;
+  $('#riStart').textContent = 'Start noise';
+  $('#riStatus').textContent = 'Pay attention to your tinnitus the moment the noise stops.';
+  $('#riResult').innerHTML = S.ri ? riText(S.ri) : '';
+};
+function riText(r) {
+  if (!r) return '';
+  if (r.outcome === 'complete' || r.outcome === 'partial') return `Last result: ${r.outcome} residual inhibition${r.seconds != null ? ` lasting ${fmtTime(r.seconds)}` : ''}.`;
+  return r.outcome === 'none' ? 'Last result: no change.' : 'Last result: louder afterwards.';
+}
+
+/* ---------- 8. results ---------- */
+const RI_LABEL = { complete: 'Complete', partial: 'Partial', none: 'None', rebound: 'Louder' };
+function hearingSummary() {
+  let worst = null, count = 0;
+  ['left', 'right'].forEach(e => Object.entries(S.audiogram[e]).forEach(([f, v]) => {
+    count++;
+    const val = v == null ? 999 : v;
+    if (+f <= 8000 && (!worst || val > worst.val)) worst = { ear: e, f: +f, val };
+  }));
+  return { count, worst };
+}
+function dipNearPitch() {
+  if (!S.pitch) return null;
+  const out = [];
+  ['left', 'right'].forEach(e => {
+    const pts = Object.entries(S.audiogram[e]).filter(([, v]) => v != null).map(([f, v]) => [+f, v]);
+    if (pts.length < 4) return;
+    const sorted = pts.map(p => p[1]).sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)];
+    let near = null;
+    pts.forEach(p => { const d = Math.abs(Math.log2(p[0] / S.pitch.freq)); if (d <= 0.6 && (!near || d < near.d)) near = { f: p[0], v: p[1], d }; });
+    if (near && near.v - med >= 10) out.push({ ear: e, f: near.f, by: near.v - med });
+  });
+  return out;
+}
+function statCard(lab, val, sub, go) {
+  return `<div class="stat"><span class="lab">${lab}</span><span class="val${val ? '' : ' none'}">${val || '—'}</span><span class="sub">${sub}</span>${!val && go ? `<button type="button" class="btn ghost small" data-go="${go}" style="justify-self:start;padding:0">Measure it</button>` : ''}</div>`;
+}
+function renderResults() {
+  const p = S.pitch, l = S.loud, m = S.mml, r = S.ri, hs = hearingSummary();
+  $('#resLead').textContent = p
+    ? `${TYPES[p.type].label} at ${fmtHz(p.freq)}, heard ${S.ear === 'head' ? 'inside the head' : S.ear === 'both' ? 'in both ears' : 'in the ' + S.ear + ' ear'}. Measured ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}.`
+    : 'Complete the pitch match to build your profile. Anything you have measured so far is shown below.';
+  $('#resStats').innerHTML = [
+    statCard('Pitch', p ? fmtHz(p.freq) : '', p ? `${noteName(p.freq)} · ${TYPES[p.type].label}${p.octave ? ' · octave checked' : ''}` : 'Not measured', 'pitch'),
+    statCard('Loudness', l ? `${minus(l.sl)} dB SL` : '', l ? `Match ${fmtDb(l.match)} · threshold ${fmtDb(l.threshold)}` : 'Not measured', 'loudness'),
+    statCard('Minimum masking', m ? (m.covered ? `${minus(m.sl)} dB SL` : 'Not covered') : '', m ? `${m.noise === 'pink' ? 'Pink' : 'White'} noise · ${m.covered ? fmtDb(m.level) : 'still audible at ' + fmtDb(m.level)}` : 'Not measured', 'masking'),
+    statCard('Residual inhibition', r ? RI_LABEL[r.outcome] : '', r ? (r.seconds ? `Lasted ${fmtTime(r.seconds)} after ${r.duration} s of noise` : `After ${r.duration} s of noise`) : 'Not measured', 'ri'),
+    statCard('Location', earName(S.ear), p ? `Matched in: ${presentLabel(p.ear).toLowerCase()}` : 'From step 3', null),
+    statCard('Hearing check', hs.count ? `${hs.count} tones` : '', hs.count && hs.worst ? `Poorest up to 8 kHz: ${fmtHz(hs.worst.f)}, ${hs.worst.ear} ear` : 'Not done', 'hearing')
+  ].join('');
+  drawChart($('#resChart'));
+  const f = [];
+  if (p) {
+    if (p.freq >= 3000 && p.freq <= 8000) f.push(`Your pitch of ${fmtHz(p.freq)} is in the 3 to 8 kHz range where most tinnitus sits. It often lines up with hearing changes from noise exposure or age.`);
+    else if (p.freq > 8000) f.push(`Your pitch of ${fmtHz(p.freq)} is very high. Hearing in this range is rarely tested in clinics, so ask for extended high-frequency testing if you get an audiogram.`);
+    else f.push(`Your pitch of ${fmtHz(p.freq)} is on the low side for tinnitus. Low-pitched or roaring tinnitus is worth describing to a clinician, especially if it comes with ear fullness or dizziness.`);
+    if (!p.octave) f.push('You skipped the octave check. Pitch matches are often off by exactly one octave, so it is worth a quick run.');
+  }
+  const dips = dipNearPitch();
+  if (dips && dips.length) dips.forEach(d => f.push(`Your ${d.ear} ear threshold near ${fmtHz(d.f)} is about ${d.by} dB poorer than your typical value, close to your tinnitus pitch. Tinnitus often sits at the edge of a dip like this.`));
+  else if (dips && hs.count >= 8) f.push('The hearing check shows no clear dip near your tinnitus pitch. Consumer headphones can miss small changes, so a clinical audiogram is still worthwhile.');
+  if (l) f.push(l.sl <= 15
+    ? `A loudness match of ${minus(l.sl)} dB SL is typical. Most people match their tinnitus within 5 to 15 dB of threshold, even when it feels loud. How much it bothers you matters more than this number.`
+    : `A loudness match of ${minus(l.sl)} dB SL is higher than usual. That can happen when hearing at that pitch is reduced. Mention it to an audiologist.`);
+  if (m) f.push(m.covered
+    ? (m.sl <= 15 ? `Noise covered your tinnitus at ${minus(m.sl)} dB above your noise threshold. Tinnitus that is easy to mask often responds well to sound enrichment.` : `Noise covered your tinnitus at ${minus(m.sl)} dB above your noise threshold. That is on the higher side, so steady background sound may help less on its own.`)
+    : 'Noise did not fully cover your tinnitus at the top level. Hard-to-mask tinnitus is worth raising with a specialist.');
+  if (r) f.push(r.outcome === 'complete' || r.outcome === 'partial'
+    ? `Your tinnitus ${r.outcome === 'complete' ? 'disappeared' : 'got quieter'} after the noise${r.seconds ? ` for ${fmtTime(r.seconds)}` : ''}. This short-term relief is called residual inhibition and suggests sound-based approaches may help you.`
+    : r.outcome === 'rebound' ? 'Your tinnitus got louder after noise. This is uncommon. Avoid loud masking sounds and mention it to a clinician.'
+    : 'No change after the noise. That is common and doesn’t rule out benefit from sound therapy.');
+  if (!f.length) f.push('Nothing measured yet. Start with the pitch match.');
+  $('#resFindings').innerHTML = f.map(x => `<li>${x}</li>`).join('');
+  renderHistory();
+}
+function summaryText() {
+  const p = S.pitch, l = S.loud, m = S.mml, r = S.ri, lines = [`Tinnitus Match · ${new Date().toLocaleString()}`];
+  lines.push(`Location: ${earName(S.ear)}`);
+  lines.push(p ? `Pitch: ${fmtHzLong(p.freq)} (${noteName(p.freq)}), ${TYPES[p.type].label}, matched in ${presentLabel(p.ear).toLowerCase()}${p.octave ? ', octave checked' : ''}` : 'Pitch: not measured');
+  lines.push(l ? `Loudness: ${l.sl} dB SL (threshold ${l.threshold} dBFS, match ${l.match} dBFS)` : 'Loudness: not measured');
+  lines.push(m ? (m.covered ? `Minimum masking level: ${m.sl} dB SL, ${m.noise} noise (threshold ${m.threshold} dBFS)` : `Minimum masking level: not covered at ${m.level} dBFS`) : 'Minimum masking level: not measured');
+  lines.push(r ? `Residual inhibition: ${RI_LABEL[r.outcome]}${r.seconds ? `, ${r.seconds} s` : ''} after ${r.duration} s at ${r.level} dBFS` : 'Residual inhibition: not measured');
+  ['right', 'left'].forEach(e => {
+    const k = Object.keys(S.audiogram[e]).map(Number).sort((a, b) => a - b);
+    if (k.length) lines.push(`${earName(e)} ear thresholds (dBFS): ` + k.map(f => `${fmtHz(f)} ${S.audiogram[e][f] == null ? 'NR' : S.audiogram[e][f]}`).join(', '));
+  });
+  lines.push(`Reference comfort level: ${S.calib} dBFS. Levels are relative to this device and volume setting.`);
+  return lines.join('\n');
+}
+$('#resCopy').addEventListener('click', () => {
+  const t = summaryText(), ta = $('#resText');
+  const fallback = () => { ta.value = t; ta.hidden = false; ta.focus(); ta.select(); $('#resMsg').textContent = 'Copying is blocked here. The summary is selected below; copy it with Ctrl+C or Cmd+C.'; };
+  try {
+    navigator.clipboard.writeText(t).then(() => { $('#resMsg').textContent = 'Summary copied.'; ta.hidden = true; }, fallback);
+  } catch (e) { fallback(); }
+});
+$('#resSave').addEventListener('click', () => {
+  const h = loadHistory();
+  h.unshift({ date: new Date().toISOString(), ear: S.ear, pitch: S.pitch, loud: S.loud, mml: S.mml, ri: S.ri });
+  $('#resMsg').textContent = saveHistory(h.slice(0, 50)) ? 'Saved to history in this browser.' : 'This browser blocked saving. Use Copy summary instead.';
+  renderHistory();
+});
+$('#resReset').addEventListener('click', () => { $('#resResetConfirm').hidden = false; });
+$('#resResetNo').addEventListener('click', () => { $('#resResetConfirm').hidden = true; });
+$('#resResetYes').addEventListener('click', () => {
+  Object.assign(S, { pitch: null, loud: null, mml: null, ri: null });
+  P.guided = null; save(); $('#resResetConfirm').hidden = true; go('describe');
+});
+function renderHistory() {
+  const h = loadHistory();
+  if (!h.length) { $('#resHistory').innerHTML = '<p class="muted small">No saved sessions yet. Save one to compare how your tinnitus changes over weeks or months.</p>'; return; }
+  $('#resHistory').innerHTML = `<table><thead><tr><th>Date</th><th>Pitch</th><th>Loudness</th><th>MML</th><th>RI</th><th></th></tr></thead><tbody>${h.map((x, i) => `<tr>
+    <td>${new Date(x.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+    <td>${x.pitch ? fmtHz(x.pitch.freq) : '—'}</td>
+    <td>${x.loud ? minus(x.loud.sl) + ' dB SL' : '—'}</td>
+    <td>${x.mml ? (x.mml.covered ? minus(x.mml.sl) + ' dB SL' : 'not covered') : '—'}</td>
+    <td>${x.ri ? RI_LABEL[x.ri.outcome] + (x.ri.seconds ? ' · ' + fmtTime(x.ri.seconds) : '') : '—'}</td>
+    <td><button type="button" class="btn ghost small" data-hdel="${i}" aria-label="Delete entry">Delete</button></td></tr>`).join('')}</tbody></table>`;
+  $$('[data-hdel]').forEach(b => b.addEventListener('click', () => { const hh = loadHistory(); hh.splice(+b.dataset.hdel, 1); saveHistory(hh); renderHistory(); }));
+}
+enterHooks.results = renderResults;
+
+/* ---------- 9. relief ---------- */
+let reliefF = 4000, reliefEnd = 0, reliefTick = null;
+const rType = () => $('input[name=rType]:checked').value;
+const reliefLevel = levelCtl('reliefLevel', { min: -110, max: MAX_NOISE, value: S.calib - 15, note: comfortNote,
+  onChange: v => { if (reliefPlay.voice) reliefPlay.voice.setDb(v); } });
+function setReliefF(f, fromSlider) {
+  reliefF = clamp(f, 500, FMAX);
+  $('#rHz').textContent = fmtHzLong(reliefF);
+  $('#rRange').textContent = `Gap from ${fmtHz(reliefF / Math.SQRT2)} to ${fmtHz(Math.min(FMAX * 1.41, reliefF * Math.SQRT2))}`;
+  if (!fromSlider) $('#rSlider').value = fToPos(reliefF);
+  if (reliefPlay.voice && rType() === 'notched') reliefPlay.voice.setFreq(reliefF);
+}
+$('#rSlider').addEventListener('input', e => setReliefF(posToF(+e.target.value), true));
+const reliefPlay = playToggle($('#rPlay'), onStop => {
+  const v = Engine.voice({ type: rType(), freq: reliefF, ear: 'both', db: reliefLevel.value, onStop: () => { reliefTimerClear(); onStop(); } });
+  reliefTimerStart();
+  return v;
+});
+function reliefTimerClear() { clearInterval(reliefTick); reliefTick = null; const c = $('#rRemain'); if (c) c.hidden = true; }
+function reliefTimerStart() {
+  reliefTimerClear();
+  const mins = +$('input[name=rTimer]:checked').value;
+  if (!mins) return;
+  reliefEnd = performance.now() + mins * 60000;
+  $('#rRemain').hidden = false;
+  const tick = () => {
+    const left = (reliefEnd - performance.now()) / 1000;
+    if (left <= 0) { reliefPlay.stop(); return; }
+    $('#rRemain').textContent = `${fmtTime(Math.ceil(left))} left`;
+  };
+  tick(); reliefTick = setInterval(tick, 1000);
+}
+$$('input[name=rTimer]').forEach(r => r.addEventListener('change', () => { if (reliefPlay.voice) reliefTimerStart(); }));
+$$('input[name=rType]').forEach(r => r.addEventListener('change', () => {
+  $('#rNotch').hidden = rType() !== 'notched';
+  if (reliefPlay.voice) { reliefPlay.stop(); $('#rPlay').click(); }
+}));
+enterHooks.relief = () => {
+  setReliefF(S.pitch ? S.pitch.freq : 4000);
+  $('#rNotch').hidden = rType() !== 'notched';
+  if (S.loud && S.pitch && !reliefPlay.voice) reliefLevel.set(Math.max(-110, S.loud.match - 5), false);
+};
+
+/* ---------- boot ---------- */
+function boot(data) {
+  if (data && data.S) S = Object.assign(freshState(), data.S);
+  calibLevel.set(S.calib, false);
+  syncDescribe();
+  const h = (location.hash || '').slice(1);
+  go(STEPS.some(s => s.id === h) ? h : S.step || 'setup');
+}
+try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({ S })); } catch (e) {}
+if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(boot);
+else boot((window.claude && window.claude.hot && window.claude.hot.data) || {});
+})();
+</script>
+</body>
+</html>
